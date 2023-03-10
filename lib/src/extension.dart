@@ -20,7 +20,5 @@
  * SOFTWARE.
  */
 
-library showcaseview;
-
-export 'src/showcase.dart';
-export 'src/showcase_widget.dart';
+// TODO: remove this function if we remove support for flutter 2.x
+T? ambiguate<T>(T? object) => object;

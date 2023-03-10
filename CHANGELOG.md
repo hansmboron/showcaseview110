@@ -1,3 +1,51 @@
+## [1.1.8] - August 5, 2022
+- Fixed [#237](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/237) - Feature added to enable/disable overlay click using `disableBarrierInteraction` parameters
+- ToolTip BorderRadius setting support
+
+## [1.1.7] - July 11, 2022
+
+- Fixed [#235](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/235) - 1.1.6 scrolling behavior in PageView.
+- Fixed [#242](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/242) - Error when display showcase on FloatingActionBar inside a TabBar (with more than 1 tab).
+
+## [1.1.6] - June 23, 2022
+
+- Fixed [#62](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/62) - While using ShowCase widget, not scrolling to respective widget when it's not visible.
+- Fixed [#131](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/131) - Support of other gestures onTargetLongPress and onTargetDoubleTap
+- Fixed [#140](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/140) - disableAnimation at ShowcaseWidget level
+- Fixed [#71](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/71) - Highlight Not working when widget is not visible on screen
+- Add flutter 3.0 support.
+
+## [1.1.5] - March 4, 2022
+
+- Fixed [#173](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/173) - showArrow not working
+- Fixed [#150](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/150) - Add condition for determine state is active
+- Fixed [#121](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/121) - SlideTransition widget in tooltip_widget.dart is constantly rebuildung even after the showcasing is supposed to have stopped
+- Fixed [#152](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/152) - Calculation of tooltip position
+- Fixed [#182](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/182) - Not providing blurValue causes Exception: Please provide ShowCaseView context
+- Fixed [#162](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/162) - Add feature to move back
+- Fixed [#181](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/181) - Add feature to go to previous item
+
+## [1.1.4] - November 26, 2021
+
+- Add glassmorphism effect in showcase background.
+- Fixed [#166](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/166) - shapeBorder need to be more customisable
+- Fixed [#163](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/163) - Null check operator used on a null value
+
+## [1.1.3] - October 28, 2021
+
+- Fixed [#158](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/158) - Arrow animation is not synchronized with tooltip
+
+## [1.1.2] - October 12, 2021
+
+- Fixed [#78](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/78) - Exception:BoxConstraints has NaN values #78
+- Fixed [#139](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/139) - Weird position #139
+- Fixed [#138](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/138) - show Unhandled Exception: Null check operator used on a null value error
+
+## [1.1.1] - July 24, 2021
+
+- Fixed [#92](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/92) - Showcase in ReorderableListView show at incorrect position
+- License update from BSD 2-Clause "Simplified" to MIT
+
 ## [1.1.0] - June 28, 2021
 
 - Fixed [#103](https://github.com/SimformSolutionsPvtLtd/flutter_showcaseview/issues/103) - add overlay padding.

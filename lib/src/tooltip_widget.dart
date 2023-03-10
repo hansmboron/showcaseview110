@@ -1,28 +1,23 @@
 /*
- * Copyright © 2020, Simform Solutions
- * All rights reserved.
+ * Copyright (c) 2021 Simform Solutions
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 import 'dart:math';
@@ -38,48 +33,65 @@ class ToolTipWidget extends StatefulWidget {
   final Size? screenSize;
   final String? title;
   final String? description;
-  final Animation<double>? animationOffset;
   final TextStyle? titleTextStyle;
   final TextStyle? descTextStyle;
   final Widget? container;
   final Color? tooltipColor;
   final Color? textColor;
-  final bool? showArrow;
+  final bool showArrow;
   final double? contentHeight;
   final double? contentWidth;
-  static late bool isArrowUp;
   final VoidCallback? onTooltipTap;
   final EdgeInsets? contentPadding;
+  final Duration animationDuration;
+  final bool disableAnimation;
+  final BorderRadius? borderRadius;
 
-  ToolTipWidget(
-      {this.position,
-      this.offset,
-      this.screenSize,
-      this.title,
-      this.description,
-      this.animationOffset,
-      this.titleTextStyle,
-      this.descTextStyle,
-      this.container,
-      this.tooltipColor,
-      this.textColor,
-      this.showArrow,
-      this.contentHeight,
-      this.contentWidth,
-      this.onTooltipTap,
-      this.contentPadding = const EdgeInsets.symmetric(vertical: 8)});
+  const ToolTipWidget({
+    Key? key,
+    required this.position,
+    required this.offset,
+    required this.screenSize,
+    required this.title,
+    required this.description,
+    required this.titleTextStyle,
+    required this.descTextStyle,
+    required this.container,
+    required this.tooltipColor,
+    required this.textColor,
+    required this.showArrow,
+    required this.contentHeight,
+    required this.contentWidth,
+    required this.onTooltipTap,
+    required this.animationDuration,
+    this.contentPadding = const EdgeInsets.symmetric(vertical: 8),
+    required this.disableAnimation,
+    required this.borderRadius,
+  }) : super(key: key);
 
   @override
-  _ToolTipWidgetState createState() => _ToolTipWidgetState();
+  State<ToolTipWidget> createState() => _ToolTipWidgetState();
 }
 
-class _ToolTipWidgetState extends State<ToolTipWidget> {
+class _ToolTipWidgetState extends State<ToolTipWidget>
+    with SingleTickerProviderStateMixin {
   Offset? position;
+
+  bool isArrowUp = false;
+
+  late final AnimationController _parentController;
+  late final Animation<double> _curvedAnimation;
 
   bool isCloseToTopOrBottom(Offset position) {
     var height = 120.0;
     height = widget.contentHeight ?? height;
-    return (widget.screenSize!.height - position.dy) <= height;
+    final bottomPosition =
+        position.dy + ((widget.position?.getHeight() ?? 0) / 2);
+    final topPosition = position.dy - ((widget.position?.getHeight() ?? 0) / 2);
+    return ((widget.screenSize?.height ?? MediaQuery.of(context).size.height) -
+                bottomPosition) <=
+            height &&
+        topPosition >= height;
   }
 
   String findPositionForContent(Offset position) {
@@ -174,63 +186,134 @@ class _ToolTipWidgetState extends State<ToolTipWidget> {
   @override
   void initState() {
     super.initState();
-    position = widget.offset;
+    _parentController = AnimationController(
+      duration: widget.animationDuration,
+      vsync: this,
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          _parentController.reverse();
+        }
+        if (_parentController.isDismissed) {
+          if (!widget.disableAnimation) {
+            _parentController.forward();
+          }
+        }
+      });
+
+    _curvedAnimation = CurvedAnimation(
+      parent: _parentController,
+      curve: Curves.easeInOut,
+    );
+
+    if (!widget.disableAnimation) {
+      _parentController.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _parentController.dispose();
+
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    position = widget.offset;
     final contentOrientation = findPositionForContent(position!);
     final contentOffsetMultiplier = contentOrientation == "BELOW" ? 1.0 : -1.0;
-    ToolTipWidget.isArrowUp = contentOffsetMultiplier == 1.0;
+    isArrowUp = contentOffsetMultiplier == 1.0;
 
-    final contentY = ToolTipWidget.isArrowUp
+    final contentY = isArrowUp
         ? widget.position!.getBottom() + (contentOffsetMultiplier * 3)
         : widget.position!.getTop() + (contentOffsetMultiplier * 3);
 
     final num contentFractionalOffset =
         contentOffsetMultiplier.clamp(-1.0, 0.0);
 
-    var paddingTop = ToolTipWidget.isArrowUp ? 22.0 : 0.0;
-    var paddingBottom = ToolTipWidget.isArrowUp ? 0.0 : 27.0;
+    var paddingTop = isArrowUp ? 22.0 : 0.0;
+    var paddingBottom = isArrowUp ? 0.0 : 27.0;
 
-    if (!widget.showArrow!) {
+    if (!widget.showArrow) {
       paddingTop = 10;
       paddingBottom = 10;
     }
 
+    const arrowWidth = 18.0;
+    const arrowHeight = 9.0;
+
     if (widget.container == null) {
-      return Stack(
-        children: <Widget>[
-          widget.showArrow! ? _getArrow(contentOffsetMultiplier) : Container(),
-          Positioned(
-            top: contentY,
-            left: _getLeft(),
-            right: _getRight(),
-            child: FractionalTranslation(
-              translation: Offset(0.0, contentFractionalOffset as double),
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: Offset(0.0, contentFractionalOffset / 10),
-                  end: Offset(0.0, 0.100),
-                ).animate(widget.animationOffset!),
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    padding:
-                        EdgeInsets.only(top: paddingTop, bottom: paddingBottom),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: GestureDetector(
-                        onTap: widget.onTooltipTap,
-                        child: Container(
-                          width: _getTooltipWidth(),
-                          padding: widget.contentPadding,
-                          color: widget.tooltipColor,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: <Widget>[
-                              Container(
-                                child: Column(
+      return Positioned(
+        top: contentY,
+        left: _getLeft(),
+        right: _getRight(),
+        child: FractionalTranslation(
+          translation: Offset(0.0, contentFractionalOffset as double),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: Offset(0.0, contentFractionalOffset / 10),
+              end: const Offset(0.0, 0.100),
+            ).animate(_curvedAnimation),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: widget.showArrow
+                    ? EdgeInsets.only(
+                        top: paddingTop - (isArrowUp ? arrowHeight : 0),
+                        bottom: paddingBottom - (isArrowUp ? 0 : arrowHeight),
+                      )
+                    : null,
+                child: Stack(
+                  alignment: isArrowUp
+                      ? Alignment.topLeft
+                      : _getLeft() == null
+                          ? Alignment.bottomRight
+                          : Alignment.bottomLeft,
+                  children: [
+                    if (widget.showArrow)
+                      Positioned(
+                        left: _getLeft() == null
+                            ? null
+                            : (widget.position!.getCenter() -
+                                (arrowWidth / 2) -
+                                (_getLeft() ?? 0)),
+                        right: _getLeft() == null
+                            ? (MediaQuery.of(context).size.width -
+                                    widget.position!.getCenter()) -
+                                (_getRight() ?? 0) -
+                                (arrowWidth / 2)
+                            : null,
+                        child: CustomPaint(
+                          painter: _Arrow(
+                            strokeColor: widget.tooltipColor!,
+                            strokeWidth: 10,
+                            paintingStyle: PaintingStyle.fill,
+                            isUpArrow: isArrowUp,
+                          ),
+                          child: const SizedBox(
+                            height: arrowHeight,
+                            width: arrowWidth,
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: isArrowUp ? arrowHeight - 1 : 0,
+                        bottom: isArrowUp ? 0 : arrowHeight - 1,
+                      ),
+                      child: ClipRRect(
+                        borderRadius:
+                            widget.borderRadius ?? BorderRadius.circular(8.0),
+                        child: GestureDetector(
+                          onTap: widget.onTooltipTap,
+                          child: Container(
+                            width: _getTooltipWidth(),
+                            padding: widget.contentPadding,
+                            color: widget.tooltipColor,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: <Widget>[
+                                Column(
                                   crossAxisAlignment: widget.title != null
                                       ? CrossAxisAlignment.start
                                       : CrossAxisAlignment.center,
@@ -242,34 +325,39 @@ class _ToolTipWidgetState extends State<ToolTipWidget> {
                                                 Theme.of(context)
                                                     .textTheme
                                                     .headline6!
-                                                    .merge(TextStyle(
-                                                        color:
-                                                            widget.textColor)),
+                                                    .merge(
+                                                      TextStyle(
+                                                        color: widget.textColor,
+                                                      ),
+                                                    ),
                                           )
-                                        : Container(),
+                                        : const SizedBox(),
                                     Text(
                                       widget.description!,
                                       style: widget.descTextStyle ??
                                           Theme.of(context)
                                               .textTheme
                                               .subtitle2!
-                                              .merge(TextStyle(
-                                                  color: widget.textColor)),
+                                              .merge(
+                                                TextStyle(
+                                                  color: widget.textColor,
+                                                ),
+                                              ),
                                     ),
                                   ],
-                                ),
-                              )
-                            ],
+                                )
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
-          )
-        ],
+          ),
+        ),
       );
     } else {
       return Stack(
@@ -282,10 +370,10 @@ class _ToolTipWidgetState extends State<ToolTipWidget> {
               child: SlideTransition(
                 position: Tween<Offset>(
                   begin: Offset(0.0, contentFractionalOffset / 10),
-                  end: !widget.showArrow! && !ToolTipWidget.isArrowUp
-                      ? Offset(0.0, 0.0)
-                      : Offset(0.0, 0.100),
-                ).animate(widget.animationOffset!),
+                  end: !widget.showArrow && !isArrowUp
+                      ? const Offset(0.0, 0.0)
+                      : const Offset(0.0, 0.100),
+                ).animate(_curvedAnimation),
                 child: Material(
                   color: Colors.transparent,
                   child: GestureDetector(
@@ -318,32 +406,6 @@ class _ToolTipWidgetState extends State<ToolTipWidget> {
     }
   }
 
-  Widget _getArrow(double contentOffsetMultiplier) {
-    final contentFractionalOffset = contentOffsetMultiplier.clamp(-1.0, 0.0);
-    return Positioned(
-      top: ToolTipWidget.isArrowUp
-          ? widget.position!.getBottom()
-          : widget.position!.getTop() - 1,
-      left: widget.position!.getCenter() - 24,
-      child: FractionalTranslation(
-        translation: Offset(0.0, contentFractionalOffset),
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: Offset(0.0, contentFractionalOffset / 5),
-            end: Offset(0.0, 0.150),
-          ).animate(widget.animationOffset!),
-          child: Icon(
-            ToolTipWidget.isArrowUp
-                ? Icons.arrow_drop_up
-                : Icons.arrow_drop_down,
-            color: widget.tooltipColor,
-            size: 50,
-          ),
-        ),
-      ),
-    );
-  }
-
   Size _textSize(String text, TextStyle style) {
     final textPainter = (TextPainter(
             text: TextSpan(text: text, style: style),
@@ -353,5 +415,51 @@ class _ToolTipWidgetState extends State<ToolTipWidget> {
           ..layout())
         .size;
     return textPainter;
+  }
+}
+
+class _Arrow extends CustomPainter {
+  final Color strokeColor;
+  final PaintingStyle paintingStyle;
+  final double strokeWidth;
+  final bool isUpArrow;
+
+  _Arrow(
+      {this.strokeColor = Colors.black,
+      this.strokeWidth = 3,
+      this.paintingStyle = PaintingStyle.stroke,
+      this.isUpArrow = true});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = strokeColor
+      ..strokeWidth = strokeWidth
+      ..style = paintingStyle;
+
+    canvas.drawPath(getTrianglePath(size.width, size.height), paint);
+  }
+
+  Path getTrianglePath(double x, double y) {
+    if (isUpArrow) {
+      return Path()
+        ..moveTo(0, y)
+        ..lineTo(x / 2, 0)
+        ..lineTo(x, y)
+        ..lineTo(0, y);
+    } else {
+      return Path()
+        ..moveTo(0, 0)
+        ..lineTo(x, 0)
+        ..lineTo(x / 2, y)
+        ..lineTo(0, 0);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Arrow oldDelegate) {
+    return oldDelegate.strokeColor != strokeColor ||
+        oldDelegate.paintingStyle != paintingStyle ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }

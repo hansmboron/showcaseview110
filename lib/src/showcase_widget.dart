@@ -1,31 +1,28 @@
 /*
- * Copyright © 2020, Simform Solutions
- * All rights reserved.
+ * Copyright (c) 2021 Simform Solutions
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 import 'package:flutter/material.dart';
+
+import '../showcaseview.dart';
 
 class ShowCaseWidget extends StatefulWidget {
   final Builder builder;
@@ -35,6 +32,16 @@ class ShowCaseWidget extends StatefulWidget {
   final bool autoPlay;
   final Duration autoPlayDelay;
   final bool autoPlayLockEnable;
+  final bool disableAnimation;
+  final bool disableBarrierInteraction;
+  final Duration scrollDuration;
+
+  /// Default overlay blur used by showcase. if [Showcase.blurValue]
+  /// is not provided.
+  ///
+  /// Default value is 0.
+  final double blurValue;
+  final bool enableAutoScroll;
 
   const ShowCaseWidget({
     required this.builder,
@@ -44,18 +51,23 @@ class ShowCaseWidget extends StatefulWidget {
     this.autoPlay = false,
     this.autoPlayDelay = const Duration(milliseconds: 2000),
     this.autoPlayLockEnable = false,
+    this.blurValue = 0,
+    this.scrollDuration = const Duration(milliseconds: 300),
+    this.disableAnimation = false,
+    this.enableAutoScroll = false,
+    this.disableBarrierInteraction = false,
   });
 
   static GlobalKey? activeTargetWidget(BuildContext context) {
     return context
-        .dependOnInheritedWidgetOfExactType<_InheritedShowCaseView>()!
-        .activeWidgetIds;
+        .dependOnInheritedWidgetOfExactType<_InheritedShowCaseView>()
+        ?.activeWidgetIds;
   }
 
-  static ShowCaseWidgetState? of(BuildContext context) {
+  static ShowCaseWidgetState of(BuildContext context) {
     final state = context.findAncestorStateOfType<ShowCaseWidgetState>();
     if (state != null) {
-      return context.findAncestorStateOfType<ShowCaseWidgetState>();
+      return state;
     } else {
       throw Exception('Please provide ShowCaseView context');
     }
@@ -69,27 +81,48 @@ class ShowCaseWidgetState extends State<ShowCaseWidget> {
   List<GlobalKey>? ids;
   int? activeWidgetId;
   late bool autoPlay;
+  late bool disableAnimation;
   late Duration autoPlayDelay;
   late bool autoPlayLockEnable;
+  late bool enableAutoScroll;
+  late bool disableBarrierInteraction;
+
+  /// Returns value of  [ShowCaseWidget.blurValue]
+  double get blurValue => widget.blurValue;
 
   @override
   void initState() {
     super.initState();
+    _init();
+  }
+
+  @override
+  void didUpdateWidget(covariant ShowCaseWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _init();
+  }
+
+  void _init() {
     autoPlayDelay = widget.autoPlayDelay;
     autoPlay = widget.autoPlay;
+    disableAnimation = widget.disableAnimation;
     autoPlayLockEnable = widget.autoPlayLockEnable;
+    enableAutoScroll = widget.enableAutoScroll;
+    disableBarrierInteraction = widget.disableBarrierInteraction;
   }
 
   void startShowCase(List<GlobalKey> widgetIds) {
-    setState(() {
-      ids = widgetIds;
-      activeWidgetId = 0;
-      _onStart();
-    });
+    if (mounted) {
+      setState(() {
+        ids = widgetIds;
+        activeWidgetId = 0;
+        _onStart();
+      });
+    }
   }
 
   void completed(GlobalKey? id) {
-    if (ids != null && ids![activeWidgetId!] == id) {
+    if (ids != null && ids![activeWidgetId!] == id && mounted) {
       setState(() {
         _onComplete();
         activeWidgetId = activeWidgetId! + 1;
@@ -105,8 +138,43 @@ class ShowCaseWidgetState extends State<ShowCaseWidget> {
     }
   }
 
+  void next() {
+    if (ids != null && mounted) {
+      setState(() {
+        _onComplete();
+        activeWidgetId = activeWidgetId! + 1;
+        _onStart();
+
+        if (activeWidgetId! >= ids!.length) {
+          _cleanupAfterSteps();
+          if (widget.onFinish != null) {
+            widget.onFinish!();
+          }
+        }
+      });
+    }
+  }
+
+  void previous() {
+    if (ids != null && ((activeWidgetId ?? 0) - 1) >= 0 && mounted) {
+      setState(() {
+        _onComplete();
+        activeWidgetId = activeWidgetId! - 1;
+        _onStart();
+        if (activeWidgetId! >= ids!.length) {
+          _cleanupAfterSteps();
+          if (widget.onFinish != null) {
+            widget.onFinish!();
+          }
+        }
+      });
+    }
+  }
+
   void dismiss() {
-    setState(_cleanupAfterSteps);
+    if (mounted) {
+      setState(_cleanupAfterSteps);
+    }
   }
 
   void _onStart() {
@@ -127,8 +195,8 @@ class ShowCaseWidgetState extends State<ShowCaseWidget> {
   @override
   Widget build(BuildContext context) {
     return _InheritedShowCaseView(
-      child: widget.builder,
       activeWidgetIds: ids?.elementAt(activeWidgetId!),
+      child: widget.builder,
     );
   }
 }
@@ -136,7 +204,7 @@ class ShowCaseWidgetState extends State<ShowCaseWidget> {
 class _InheritedShowCaseView extends InheritedWidget {
   final GlobalKey? activeWidgetIds;
 
-  _InheritedShowCaseView({
+  const _InheritedShowCaseView({
     required this.activeWidgetIds,
     required Widget child,
   }) : super(child: child);

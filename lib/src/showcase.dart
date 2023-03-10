@@ -1,49 +1,47 @@
 /*
- * Copyright © 2020, Simform Solutions
- * All rights reserved.
+ * Copyright (c) 2021 Simform Solutions
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 import 'dart:async';
+import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
-import 'custom_paint.dart';
+import 'extension.dart';
 import 'get_position.dart';
 import 'layout_overlays.dart';
+import 'shape_clipper.dart';
 import 'showcase_widget.dart';
 import 'tooltip_widget.dart';
 
 class Showcase extends StatefulWidget {
   @override
-  final GlobalKey? key;
+  final GlobalKey key;
 
   final Widget child;
   final String? title;
   final String? description;
   final ShapeBorder? shapeBorder;
+  final BorderRadius? radius;
   final TextStyle? titleTextStyle;
   final TextStyle? descTextStyle;
   final EdgeInsets contentPadding;
@@ -52,6 +50,7 @@ class Showcase extends StatefulWidget {
   final Widget? container;
   final Color showcaseBackgroundColor;
   final Color textColor;
+  final Widget scrollLoadingWidget;
   final bool showArrow;
   final double? height;
   final double? width;
@@ -59,35 +58,53 @@ class Showcase extends StatefulWidget {
   final VoidCallback? onToolTipClick;
   final VoidCallback? onTargetClick;
   final bool? disposeOnTap;
-  final bool disableAnimation;
+  final bool? disableAnimation;
   final EdgeInsets overlayPadding;
+  final VoidCallback? onTargetDoubleTap;
+  final VoidCallback? onTargetLongPress;
+  final BorderRadius? tipBorderRadius;
 
-  const Showcase(
-      {required this.key,
-      required this.child,
-      this.title,
-      required this.description,
-      this.shapeBorder,
-      this.overlayColor = Colors.black,
-      this.overlayOpacity = 0.75,
-      this.titleTextStyle,
-      this.descTextStyle,
-      this.showcaseBackgroundColor = Colors.white,
-      this.textColor = Colors.black,
-      this.showArrow = true,
-      this.onTargetClick,
-      this.disposeOnTap,
-      this.animationDuration = const Duration(milliseconds: 2000),
-      this.disableAnimation = false,
-      this.contentPadding =
-          const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-      this.onToolTipClick,
-      this.overlayPadding = EdgeInsets.zero})
-      : height = null,
+  /// Defines blur value.
+  /// This will blur the background while displaying showcase.
+  ///
+  /// If null value is provided,
+  /// [ShowCaseWidget.defaultBlurValue] will be considered.
+  ///
+  final double? blurValue;
+
+  const Showcase({
+    required this.key,
+    required this.child,
+    this.title,
+    required this.description,
+    this.shapeBorder,
+    this.overlayColor = Colors.black45,
+    this.overlayOpacity = 0.75,
+    this.titleTextStyle,
+    this.descTextStyle,
+    this.showcaseBackgroundColor = Colors.white,
+    this.textColor = Colors.black,
+    this.scrollLoadingWidget = const CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation(Colors.white)),
+    this.showArrow = true,
+    this.onTargetClick,
+    this.disposeOnTap,
+    this.animationDuration = const Duration(milliseconds: 2000),
+    this.disableAnimation,
+    this.contentPadding =
+        const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+    this.onToolTipClick,
+    this.overlayPadding = EdgeInsets.zero,
+    this.blurValue,
+    this.radius,
+    this.onTargetLongPress,
+    this.onTargetDoubleTap,
+    this.tipBorderRadius,
+  })  : height = null,
         width = null,
         container = null,
         assert(overlayOpacity >= 0.0 && overlayOpacity <= 1.0,
-            "overlay opacity should be >= 0.0 and <= 1.0."),
+            "overlay opacity must be between 0 and 1."),
         assert(
             onTargetClick == null
                 ? true
@@ -100,7 +117,7 @@ class Showcase extends StatefulWidget {
             "onTargetClick is required if you're using disposeOnTap");
 
   const Showcase.withWidget({
-    this.key,
+    required this.key,
     required this.child,
     required this.container,
     required this.height,
@@ -108,63 +125,41 @@ class Showcase extends StatefulWidget {
     this.title,
     this.description,
     this.shapeBorder,
-    this.overlayColor = Colors.black,
+    this.overlayColor = Colors.black45,
+    this.radius,
     this.overlayOpacity = 0.75,
     this.titleTextStyle,
     this.descTextStyle,
     this.showcaseBackgroundColor = Colors.white,
     this.textColor = Colors.black,
+    this.scrollLoadingWidget = const CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation(Colors.white)),
     this.onTargetClick,
     this.disposeOnTap,
     this.animationDuration = const Duration(milliseconds: 2000),
-    this.disableAnimation = false,
+    this.disableAnimation,
     this.contentPadding = const EdgeInsets.symmetric(vertical: 8),
     this.overlayPadding = EdgeInsets.zero,
+    this.blurValue,
+    this.onTargetLongPress,
+    this.onTargetDoubleTap,
+    this.tipBorderRadius,
   })  : showArrow = false,
         onToolTipClick = null,
         assert(overlayOpacity >= 0.0 && overlayOpacity <= 1.0,
-            "overlay opacity should be >= 0.0 and <= 1.0.");
+            "overlay opacity must be between 0 and 1.");
 
   @override
-  _ShowcaseState createState() => _ShowcaseState();
+  State<Showcase> createState() => _ShowcaseState();
 }
 
-class _ShowcaseState extends State<Showcase> with TickerProviderStateMixin {
+class _ShowcaseState extends State<Showcase> {
   bool _showShowCase = false;
-  Animation<double>? _slideAnimation;
-  late AnimationController _slideAnimationController;
+  bool _isScrollRunning = false;
   Timer? timer;
   GetPosition? position;
 
-  @override
-  void initState() {
-    super.initState();
-
-    _slideAnimationController = AnimationController(
-      duration: widget.animationDuration,
-      vsync: this,
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          _slideAnimationController.reverse();
-        }
-        if (_slideAnimationController.isDismissed) {
-          if (!widget.disableAnimation) {
-            _slideAnimationController.forward();
-          }
-        }
-      });
-
-    _slideAnimation = CurvedAnimation(
-      parent: _slideAnimationController,
-      curve: Curves.easeInOut,
-    );
-  }
-
-  @override
-  void dispose() {
-    _slideAnimationController.dispose();
-    super.dispose();
-  }
+  ShowCaseWidgetState get showCaseWidgetState => ShowCaseWidget.of(context);
 
   @override
   void didChangeDependencies() {
@@ -178,7 +173,6 @@ class _ShowcaseState extends State<Showcase> with TickerProviderStateMixin {
     showOverlay();
   }
 
-  ///
   /// show overlay if there is any target widget
   ///
   void showOverlay() {
@@ -188,14 +182,32 @@ class _ShowcaseState extends State<Showcase> with TickerProviderStateMixin {
     });
 
     if (activeStep == widget.key) {
-      _slideAnimationController.forward();
-      if (ShowCaseWidget.of(context)!.autoPlay) {
+      if (ShowCaseWidget.of(context).enableAutoScroll) {
+        _scrollIntoView();
+      }
+
+      if (showCaseWidgetState.autoPlay) {
         timer = Timer(
-            Duration(
-                seconds: ShowCaseWidget.of(context)!.autoPlayDelay.inSeconds),
+            Duration(seconds: showCaseWidgetState.autoPlayDelay.inSeconds),
             _nextIfAny);
       }
     }
+  }
+
+  void _scrollIntoView() {
+    ambiguate(WidgetsBinding.instance)?.addPostFrameCallback((timeStamp) async {
+      setState(() {
+        _isScrollRunning = true;
+      });
+      await Scrollable.ensureVisible(
+        widget.key.currentContext!,
+        duration: showCaseWidgetState.widget.scrollDuration,
+        alignment: 0.5,
+      );
+      setState(() {
+        _isScrollRunning = false;
+      });
+    });
   }
 
   @override
@@ -218,22 +230,19 @@ class _ShowcaseState extends State<Showcase> with TickerProviderStateMixin {
 
   void _nextIfAny() {
     if (timer != null && timer!.isActive) {
-      if (ShowCaseWidget.of(context)!.autoPlayLockEnable) {
+      if (showCaseWidgetState.autoPlayLockEnable) {
         return;
       }
       timer!.cancel();
     } else if (timer != null && !timer!.isActive) {
       timer = null;
     }
-    ShowCaseWidget.of(context)!.completed(widget.key);
-    if (!widget.disableAnimation) {
-      _slideAnimationController.forward();
-    }
+    showCaseWidgetState.completed(widget.key);
   }
 
   void _getOnTargetTap() {
     if (widget.disposeOnTap == true) {
-      ShowCaseWidget.of(context)!.dismiss();
+      showCaseWidgetState.dismiss();
       widget.onTargetClick!();
     } else {
       (widget.onTargetClick ?? _nextIfAny).call();
@@ -242,7 +251,7 @@ class _ShowcaseState extends State<Showcase> with TickerProviderStateMixin {
 
   void _getOnTooltipTap() {
     if (widget.disposeOnTap == true) {
-      ShowCaseWidget.of(context)!.dismiss();
+      showCaseWidgetState.dismiss();
     }
     widget.onToolTipClick?.call();
   }
@@ -252,70 +261,114 @@ class _ShowcaseState extends State<Showcase> with TickerProviderStateMixin {
     Size size,
     Rect rectBound,
     Size screenSize,
-  ) =>
-      Visibility(
-        visible: _showShowCase,
-        maintainAnimation: true,
-        maintainState: true,
-        child: Stack(
-          children: [
-            GestureDetector(
-              onTap: _nextIfAny,
-              child: Container(
-                width: MediaQuery.of(context).size.width,
-                height: MediaQuery.of(context).size.height,
-                child: CustomPaint(
-                  painter: ShapePainter(
-                      opacity: widget.overlayOpacity,
-                      rect: position!.getRect(),
-                      shapeBorder: widget.shapeBorder,
-                      color: widget.overlayColor),
+  ) {
+    var blur = 0.0;
+    if (_showShowCase) {
+      blur = widget.blurValue ?? showCaseWidgetState.blurValue;
+    }
+
+    // Set blur to 0 if application is running on web and
+    // provided blur is less than 0.
+    blur = kIsWeb && blur < 0 ? 0 : blur;
+
+    return _showShowCase
+        ? Stack(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (!showCaseWidgetState.disableBarrierInteraction) {
+                    _nextIfAny();
+                  }
+                },
+                child: ClipPath(
+                  clipper: RRectClipper(
+                    area: _isScrollRunning ? Rect.zero : rectBound,
+                    isCircle: widget.shapeBorder == const CircleBorder(),
+                    radius:
+                        _isScrollRunning ? BorderRadius.zero : widget.radius,
+                    overlayPadding: _isScrollRunning
+                        ? EdgeInsets.zero
+                        : widget.overlayPadding,
+                  ),
+                  child: blur != 0
+                      ? BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                          child: Container(
+                            width: MediaQuery.of(context).size.width,
+                            height: MediaQuery.of(context).size.height,
+                            decoration: BoxDecoration(
+                              color: widget.overlayColor
+                                  .withOpacity(widget.overlayOpacity),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: MediaQuery.of(context).size.width,
+                          height: MediaQuery.of(context).size.height,
+                          decoration: BoxDecoration(
+                            color: widget.overlayColor
+                                .withOpacity(widget.overlayOpacity),
+                          ),
+                        ),
                 ),
               ),
-            ),
-            _TargetWidget(
-              offset: offset,
-              size: size,
-              onTap: _getOnTargetTap,
-              shapeBorder: widget.shapeBorder,
-            ),
-            ToolTipWidget(
-              position: position,
-              offset: offset,
-              screenSize: screenSize,
-              title: widget.title,
-              description: widget.description,
-              animationOffset: _slideAnimation,
-              titleTextStyle: widget.titleTextStyle,
-              descTextStyle: widget.descTextStyle,
-              container: widget.container,
-              tooltipColor: widget.showcaseBackgroundColor,
-              textColor: widget.textColor,
-              showArrow: widget.showArrow,
-              contentHeight: widget.height,
-              contentWidth: widget.width,
-              onTooltipTap: _getOnTooltipTap,
-              contentPadding: widget.contentPadding,
-            ),
-          ],
-        ),
-      );
+              if (_isScrollRunning) Center(child: widget.scrollLoadingWidget),
+              if (!_isScrollRunning)
+                _TargetWidget(
+                  offset: offset,
+                  size: size,
+                  onTap: _getOnTargetTap,
+                  radius: widget.radius,
+                  onDoubleTap: widget.onTargetDoubleTap,
+                  onLongPress: widget.onTargetLongPress,
+                  shapeBorder: widget.shapeBorder,
+                ),
+              if (!_isScrollRunning)
+                ToolTipWidget(
+                  position: position,
+                  offset: offset,
+                  screenSize: screenSize,
+                  title: widget.title,
+                  description: widget.description,
+                  titleTextStyle: widget.titleTextStyle,
+                  descTextStyle: widget.descTextStyle,
+                  container: widget.container,
+                  tooltipColor: widget.showcaseBackgroundColor,
+                  textColor: widget.textColor,
+                  showArrow: widget.showArrow,
+                  contentHeight: widget.height,
+                  contentWidth: widget.width,
+                  onTooltipTap: _getOnTooltipTap,
+                  contentPadding: widget.contentPadding,
+                  disableAnimation: widget.disableAnimation ??
+                      showCaseWidgetState.disableAnimation,
+                  animationDuration: widget.animationDuration,
+                  borderRadius: widget.tipBorderRadius,
+                ),
+            ],
+          )
+        : const SizedBox.shrink();
+  }
 }
 
 class _TargetWidget extends StatelessWidget {
   final Offset offset;
   final Size? size;
-  final Animation<double>? widthAnimation;
   final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
+  final VoidCallback? onLongPress;
   final ShapeBorder? shapeBorder;
+  final BorderRadius? radius;
 
-  _TargetWidget({
+  const _TargetWidget({
     Key? key,
     required this.offset,
     this.size,
-    this.widthAnimation,
     this.onTap,
     this.shapeBorder,
+    this.radius,
+    this.onDoubleTap,
+    this.onLongPress,
   }) : super(key: key);
 
   @override
@@ -327,16 +380,20 @@ class _TargetWidget extends StatelessWidget {
         translation: const Offset(-0.5, -0.5),
         child: GestureDetector(
           onTap: onTap,
+          onLongPress: onLongPress,
+          onDoubleTap: onDoubleTap,
           child: Container(
             height: size!.height + 16,
             width: size!.width + 16,
             decoration: ShapeDecoration(
-              shape: shapeBorder ??
-                  RoundedRectangleBorder(
-                    borderRadius: const BorderRadius.all(
-                      Radius.circular(8),
-                    ),
-                  ),
+              shape: radius != null
+                  ? RoundedRectangleBorder(borderRadius: radius!)
+                  : shapeBorder ??
+                      const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(
+                          Radius.circular(8),
+                        ),
+                      ),
             ),
           ),
         ),
