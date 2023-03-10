@@ -319,17 +319,29 @@ class _ToolTipWidgetState extends State<ToolTipWidget>
                                       : CrossAxisAlignment.center,
                                   children: <Widget>[
                                     widget.title != null
-                                        ? Text(
-                                            widget.title!,
-                                            style: widget.titleTextStyle ??
-                                                Theme.of(context)
-                                                    .textTheme
-                                                    .headline6!
-                                                    .merge(
-                                                      TextStyle(
-                                                        color: widget.textColor,
-                                                      ),
-                                                    ),
+                                        ? Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                widget.title!,
+                                                style: widget.titleTextStyle ??
+                                                    Theme.of(context).textTheme.headline6!.merge(
+                                                          TextStyle(
+                                                            color: widget.textColor,
+                                                          ),
+                                                        ),
+                                              ),
+                                              SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child: IconButton(
+                                                    onPressed: () {},
+                                                    icon: Icon(
+                                                      Icons.close,
+                                                      color: Colors.black,
+                                                    )),
+                                              )
+                                            ],
                                           )
                                         : const SizedBox(),
                                     Text(
